@@ -1,0 +1,40 @@
+.DS_Store
+Thumbs.db
+
+# Xcode user and build state
+DerivedData/
+build/
+.build/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+
+# Archives and debug symbols
+*.xcarchive
+*.ipa
+*.dSYM
+
+# Signing material - never commit these
+*.mobileprovision
+*.provisionprofile
+*.p8
+*.p12
+*.cer
+*.key
+*.pem
+.env
+.env.*
+
+# Tooling output
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Non-iOS local tooling
+local.properties
+.idea/
+.gradle/

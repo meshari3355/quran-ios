@@ -1,0 +1,445 @@
+// =============================================================
+// AzkarDuaWidget.swift  — Widget Extension Target
+// ويدجت الأذكار اليومية والأدعية
+// =============================================================
+
+import WidgetKit
+import SwiftUI
+
+// MARK: - Azkar data (تدور كل ساعتين — 12 ذكراً في اليوم)
+
+private let azkarWidgetItems: [(text: String, category: String)] = [
+    ("سُبْحَانَ اللَّهِ وَبِحَمْدِهِ", "تسبيح"),
+    ("لَا إِلَهَ إِلَّا اللَّهُ وَحْدَهُ لَا شَرِيكَ لَهُ، لَهُ الْمُلْكُ وَلَهُ الْحَمْدُ وَهُوَ عَلَى كُلِّ شَيْءٍ قَدِيرٌ", "ذكر الصباح"),
+    ("اللَّهُمَّ بِكَ أَصْبَحْنَا وَبِكَ أَمْسَيْنَا وَبِكَ نَحْيَا وَبِكَ نَمُوتُ وَإِلَيْكَ النُّشُورُ", "ذكر الصباح"),
+    ("بِسْمِ اللَّهِ الَّذِي لَا يَضُرُّ مَعَ اسْمِهِ شَيْءٌ فِي الأَرْضِ وَلَا فِي السَّمَاءِ وَهُوَ السَّمِيعُ الْعَلِيمُ", "الحماية"),
+    ("اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْهَمِّ وَالْحَزَنِ، وَأَعُوذُ بِكَ مِنَ الْعَجْزِ وَالْكَسَلِ", "دعاء الصباح"),
+    ("حَسْبِيَ اللَّهُ لَا إِلَهَ إِلَّا هُوَ عَلَيْهِ تَوَكَّلْتُ وَهُوَ رَبُّ الْعَرْشِ الْعَظِيمِ", "توكل"),
+    ("رَضِيتُ بِاللَّهِ رَبًّا وَبِالإِسْلَامِ دِينًا وَبِمُحَمَّدٍ ﷺ نَبِيًّا وَرَسُولاً", "رضا"),
+    ("سُبْحَانَ اللَّهِ وَالْحَمْدُ لِلَّهِ وَلَا إِلَهَ إِلَّا اللَّهُ وَاللَّهُ أَكْبَرُ", "تسبيح"),
+    ("اللَّهُمَّ صَلِّ وَسَلِّمْ وَبَارِكْ عَلَى نَبِيِّنَا مُحَمَّدٍ", "صلاة على النبي ﷺ"),
+    ("أَسْتَغْفِرُ اللَّهَ الْعَظِيمَ الَّذِي لَا إِلَهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ وَأَتُوبُ إِلَيْهِ", "استغفار"),
+    ("اللَّهُمَّ أَنْتَ رَبِّي لَا إِلَهَ إِلَّا أَنْتَ، خَلَقْتَنِي وَأَنَا عَبْدُكَ", "سيد الاستغفار"),
+    ("اللَّهُمَّ عَافِنِي فِي بَدَنِي، اللَّهُمَّ عَافِنِي فِي سَمْعِي، اللَّهُمَّ عَافِنِي فِي بَصَرِي", "ذكر الصباح"),
+    ("لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ الْعَلِيِّ الْعَظِيمِ", "تحصين"),
+    ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَفْوَ وَالْعَافِيَةَ فِي الدُّنْيَا وَالآخِرَةِ", "دعاء المساء"),
+    ("يَا حَيُّ يَا قَيُّومُ بِرَحْمَتِكَ أَسْتَغِيثُ", "توسل"),
+    ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الْجَنَّةَ وَأَعُوذُ بِكَ مِنَ النَّارِ", "دعاء المساء"),
+    ("سُبْحَانَ اللَّهِ وَبِحَمْدِهِ سُبْحَانَ اللَّهِ الْعَظِيمِ", "تسبيح"),
+    ("اللَّهُمَّ إِنَّكَ عَفُوٌّ تُحِبُّ الْعَفْوَ فَاعْفُ عَنِّي", "العفو"),
+    ("اللَّهُمَّ أَصْلِحْ لِي دِينِي الَّذِي هُوَ عِصْمَةُ أَمْرِي، وَأَصْلِحْ لِي دُنْيَايَ الَّتِي فِيهَا مَعَاشِي", "دعاء الصلاح"),
+    ("اللَّهُمَّ اهْدِنِي فِيمَنْ هَدَيْتَ وَعَافِنِي فِيمَنْ عَافَيْتَ", "دعاء القنوت"),
+    ("أَعُوذُ بِكَلِمَاتِ اللَّهِ التَّامَّاتِ مِنْ شَرِّ مَا خَلَقَ", "الحماية"),
+    ("اللَّهُمَّ أَنْتَ السَّلَامُ وَمِنْكَ السَّلَامُ تَبَارَكْتَ يَا ذَا الْجَلَالِ وَالإِكْرَامِ", "ذكر بعد الصلاة"),
+    ("اللَّهُمَّ لَكَ أَسْلَمْتُ وَبِكَ آمَنْتُ وَعَلَيْكَ تَوَكَّلْتُ وَإِلَيْكَ أَنَبْتُ", "ذكر النوم"),
+    ("بِاسْمِكَ اللَّهُمَّ أَمُوتُ وَأَحْيَا", "ذكر النوم"),
+]
+
+// MARK: - Dua data (تتغير يومياً)
+
+private let duaItems: [(text: String, occasion: String)] = [
+    ("رَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً وَفِي الآخِرَةِ حَسَنَةً وَقِنَا عَذَابَ النَّارِ", "دعاء شامل"),
+    ("اللَّهُمَّ أَعِنِّي عَلَى ذِكْرِكَ وَشُكْرِكَ وَحُسْنِ عِبَادَتِكَ", "دعاء العبادة"),
+    ("رَبِّ اشْرَحْ لِي صَدْرِي وَيَسِّرْ لِي أَمْرِي وَاحْلُلْ عُقْدَةً مِنْ لِسَانِي يَفْقَهُوا قَوْلِي", "دعاء التيسير"),
+    ("اللَّهُمَّ إِنِّي أَسْأَلُكَ الْعَافِيَةَ فِي الدُّنْيَا وَالآخِرَةِ", "دعاء العافية"),
+    ("رَبِّ زِدْنِي عِلْماً وَارْزُقْنِي فَهْماً", "دعاء العلم"),
+    ("اللَّهُمَّ اهْدِنِي وَسَدِّدْنِي وَاحْفَظْنِي مِنَ الشَّرِّ", "دعاء الهداية"),
+    ("اللَّهُمَّ إِنِّي أَسْأَلُكَ حُبَّكَ وَحُبَّ مَنْ يُحِبُّكَ وَحُبَّ عَمَلٍ يُقَرِّبُنِي إِلَى حُبِّكَ", "دعاء المحبة"),
+    ("اللَّهُمَّ أَصْلِحْ لِي دِينِي وَدُنْيَايَ وَآخِرَتِي وَاجْعَلِ الْحَيَاةَ زِيَادَةً لِي فِي كُلِّ خَيْرٍ", "دعاء الصلاح"),
+    ("رَبِّ إِنِّي لِمَا أَنزَلْتَ إِلَيَّ مِنْ خَيْرٍ فَقِيرٌ", "دعاء الرزق"),
+    ("اللَّهُمَّ إِنِّي أَعُوذُ بِكَ مِنَ الْكُفْرِ وَالْفَقْرِ، وَأَعُوذُ بِكَ مِنْ عَذَابِ الْقَبْرِ", "دعاء الحماية"),
+    ("اللَّهُمَّ اجْعَلْنِي مِنَ التَّوَّابِينَ وَاجْعَلْنِي مِنَ الْمُتَطَهِّرِينَ", "دعاء التوبة"),
+    ("رَبَّنَا هَبْ لَنَا مِنْ أَزْوَاجِنَا وَذُرِّيَّاتِنَا قُرَّةَ أَعْيُنٍ وَاجْعَلْنَا لِلْمُتَّقِينَ إِمَامًا", "دعاء الأسرة"),
+    ("اللَّهُمَّ احْفَظْنِي مِنْ بَيْنِ يَدَيَّ وَمِنْ خَلْفِي وَعَنْ يَمِينِي وَعَنْ شِمَالِي وَمِنْ فَوْقِي", "دعاء الحفظ"),
+    ("اللَّهُمَّ فَرِّجْ هَمِّي وَاكْشِفْ كَرْبِي وَأَجِبْ دَعْوَتِي وَثَبِّتْ حُجَّتِي", "دعاء الفرج"),
+]
+
+// MARK: - Entries
+
+struct AzkarEntry: TimelineEntry {
+    let date: Date
+    let zikr: String
+    let category: String
+    let isEvening: Bool
+}
+
+struct DuaEntry: TimelineEntry {
+    let date: Date
+    let dua: String
+    let occasion: String
+}
+
+// MARK: - AzkarProvider (يتغير كل ساعتين)
+
+struct AzkarProvider: TimelineProvider {
+    func placeholder(in context: Context) -> AzkarEntry {
+        AzkarEntry(date: .now, zikr: azkarWidgetItems[0].text,
+                   category: azkarWidgetItems[0].category, isEvening: false)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (AzkarEntry) -> Void) {
+        completion(makeEntry(for: .now))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<AzkarEntry>) -> Void) {
+        // ذكر جديد كل ساعتين — 12 ذكراً في اليوم
+        let intervalSeconds = 2 * 60 * 60   // ساعتان
+        var entries: [AzkarEntry] = []
+
+        for i in 0..<12 {
+            let entryDate = Date(timeIntervalSinceNow: Double(i * intervalSeconds))
+            entries.append(makeEntry(for: entryDate))
+        }
+
+        let refreshDate = Date(timeIntervalSinceNow: Double(12 * intervalSeconds))
+        completion(Timeline(entries: entries, policy: .after(refreshDate)))
+    }
+
+    private func makeEntry(for date: Date) -> AzkarEntry {
+        let cal       = Calendar.current
+        let dayOfYear = cal.ordinality(of: .day, in: .year, for: date) ?? 1
+        let hour      = cal.component(.hour, from: date)
+        // كل ساعتين يتغير الذكر، مع مراعاة اليوم لتجنب التكرار في أيام مختلفة
+        let slot      = hour / 2
+        let idx       = (dayOfYear * 12 + slot) % azkarWidgetItems.count
+        let isEvening = hour >= 15
+        return AzkarEntry(date: date,
+                          zikr: azkarWidgetItems[idx].text,
+                          category: azkarWidgetItems[idx].category,
+                          isEvening: isEvening)
+    }
+}
+
+// MARK: - DuaProvider (يتغير يومياً عند منتصف الليل)
+
+struct DuaProvider: TimelineProvider {
+    func placeholder(in context: Context) -> DuaEntry {
+        DuaEntry(date: .now, dua: duaItems[0].text, occasion: duaItems[0].occasion)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (DuaEntry) -> Void) {
+        completion(makeEntry(for: .now))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<DuaEntry>) -> Void) {
+        let entry = makeEntry(for: .now)
+        // تحديث عند منتصف الليل القادم
+        let tomorrow  = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? Date(timeIntervalSinceNow: 86400)
+        let midnight  = Calendar.current.startOfDay(for: tomorrow)
+        completion(Timeline(entries: [entry], policy: .after(midnight)))
+    }
+
+    private func makeEntry(for date: Date) -> DuaEntry {
+        let dayOfYear = Calendar.current.ordinality(of: .day, in: .year, for: date) ?? 1
+        let idx       = (dayOfYear - 1) % duaItems.count
+        return DuaEntry(date: date, dua: duaItems[idx].text, occasion: duaItems[idx].occasion)
+    }
+}
+
+// MARK: - AzkarWidget (شاشة الرئيسية + شاشة القفل)
+
+struct AzkarWidget: Widget {
+    let kind = "AzkarWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: AzkarProvider()) { entry in
+            AzkarWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("أذكار اليوم")
+        .description("ذكر يتجدد كل ساعتين — صباحاً ومساءً")
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .accessoryRectangular,   // شاشة القفل — مستطيل
+            .accessoryCircular,      // شاشة القفل — دائرة
+            .accessoryInline,        // شاشة القفل — سطر واحد
+        ])
+    }
+}
+
+// MARK: - DuaWidget (شاشة الرئيسية + شاشة القفل)
+
+struct DuaWidget: Widget {
+    let kind = "DuaWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: DuaProvider()) { entry in
+            DuaWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("دعاء اليوم")
+        .description("دعاء جديد كل يوم من كنز الأدعية النبوية")
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .accessoryRectangular,   // شاشة القفل — مستطيل
+        ])
+    }
+}
+
+// MARK: - AzkarWidgetView
+
+struct AzkarWidgetView: View {
+    let entry: AzkarEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        switch family {
+
+        // ── شاشة القفل: سطر واحد ──────────────────────────────────
+        case .accessoryInline:
+            Label {
+                Text(entry.zikr)
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: entry.isEvening ? "moon.stars.fill" : "sun.horizon.fill")
+            }
+
+        // ── شاشة القفل: دائرة ──────────────────────────────────────
+        case .accessoryCircular:
+            ZStack {
+                AccessoryWidgetBackground()
+                VStack(spacing: 2) {
+                    Image(systemName: entry.isEvening ? "moon.stars.fill" : "sun.horizon.fill")
+                        .font(.system(size: 14))
+                    Text(entry.category)
+                        .font(.system(size: 8, weight: .semibold))
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+
+        // ── شاشة القفل: مستطيل ─────────────────────────────────────
+        case .accessoryRectangular:
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack {
+                    Spacer()
+                    Image(systemName: entry.isEvening ? "moon.stars.fill" : "sun.horizon.fill")
+                        .font(.system(size: 9))
+                    Text(entry.category)
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                Text(entry.zikr)
+                    .font(.system(size: 10))
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+        // ── شاشة الرئيسية ──────────────────────────────────────────
+        default:
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack {
+                    Spacer()
+                    Label(entry.category,
+                          systemImage: entry.isEvening ? "moon.stars.fill" : "sun.horizon.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(entry.isEvening ? .indigo : .orange)
+                }
+                Text(entry.zikr)
+                    .font(.system(size: family == .systemSmall ? 12 : 14))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.trailing)
+                    .lineSpacing(5)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(family == .systemSmall ? 4 : 6)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("يتجدد كل ساعتين")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(family == .systemSmall ? 10 : 14)
+        }
+    }
+}
+
+// MARK: - DuaWidgetView
+
+struct DuaWidgetView: View {
+    let entry: DuaEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        switch family {
+
+        // ── شاشة القفل: مستطيل ─────────────────────────────────────
+        case .accessoryRectangular:
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "hand.raised.fill")
+                        .font(.system(size: 9))
+                    Text(entry.occasion)
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                Text(entry.dua)
+                    .font(.system(size: 10))
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+
+        // ── شاشة الرئيسية ──────────────────────────────────────────
+        default:
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack {
+                    Spacer()
+                    Label(entry.occasion, systemImage: "hand.raised.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.green)
+                }
+                Text(entry.dua)
+                    .font(.system(size: family == .systemSmall ? 12 : 14))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.trailing)
+                    .lineSpacing(5)
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(family == .systemSmall ? 4 : 7)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("دعاء اليوم")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(family == .systemSmall ? 10 : 14)
+        }
+    }
+}
+
+// MARK: - Daily Verse Widget (آية اليوم)
+
+struct DailyVerseWidget: Widget {
+    let kind = "DailyVerseWidget"
+
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: kind, provider: VerseProvider()) { entry in
+            VerseWidgetView(entry: entry)
+                .containerBackground(.fill.tertiary, for: .widget)
+        }
+        .configurationDisplayName("آية اليوم")
+        .description("آية قرآنية تتغير يومياً")
+        .supportedFamilies([
+            .systemSmall,
+            .systemMedium,
+            .accessoryRectangular,   // شاشة القفل
+        ])
+    }
+}
+
+struct VerseEntry: TimelineEntry {
+    let date: Date
+    let verse: String
+    let ref: String      // e.g. "البقرة:255"
+}
+
+struct VerseProvider: TimelineProvider {
+    private let verses: [(String, String)] = [
+        ("اللَّهُ لَا إِلَٰهَ إِلَّا هُوَ الْحَيُّ الْقَيُّومُ ۚ لَا تَأْخُذُهُ سِنَةٌ وَلَا نَوْمٌ", "البقرة:255"),
+        ("وَمَنْ يَتَوَكَّلْ عَلَى اللَّهِ فَهُوَ حَسْبُهُ ۚ إِنَّ اللَّهَ بَالِغُ أَمْرِهِ", "الطلاق:3"),
+        ("فَإِنَّ مَعَ الْعُسْرِ يُسْرًا ۞ إِنَّ مَعَ الْعُسْرِ يُسْرًا", "الشرح:5-6"),
+        ("وَإِذَا سَأَلَكَ عِبَادِي عَنِّي فَإِنِّي قَرِيبٌ ۖ أُجِيبُ دَعْوَةَ الدَّاعِ إِذَا دَعَانِ", "البقرة:186"),
+        ("إِنَّمَا يُوَفَّى الصَّابِرُونَ أَجْرَهُمْ بِغَيْرِ حِسَابٍ", "الزمر:10"),
+        ("قُلْ يَا عِبَادِيَ الَّذِينَ أَسْرَفُوا عَلَىٰ أَنفُسِهِمْ لَا تَقْنَطُوا مِن رَّحْمَةِ اللَّهِ", "الزمر:53"),
+        ("وَلَسَوْفَ يُعْطِيكَ رَبُّكَ فَتَرْضَىٰ", "الضحى:5"),
+        ("أَلَا بِذِكْرِ اللَّهِ تَطْمَئِنُّ الْقُلُوبُ", "الرعد:28"),
+        ("وَقُل رَّبِّ زِدْنِي عِلْمًا", "طه:114"),
+        ("إِنَّ اللَّهَ مَعَ الصَّابِرِينَ", "البقرة:153"),
+        ("وَعَسَىٰ أَن تَكْرَهُوا شَيْئًا وَهُوَ خَيْرٌ لَّكُمْ", "البقرة:216"),
+        ("فَاذْكُرُونِي أَذْكُرْكُمْ وَاشْكُرُوا لِي وَلَا تَكْفُرُونِ", "البقرة:152"),
+        ("وَاللَّهُ يُحِبُّ الصَّابِرِينَ", "آل عمران:146"),
+        ("إِنَّ اللَّهَ لَا يُضِيعُ أَجْرَ الْمُحْسِنِينَ", "التوبة:120"),
+    ]
+
+    func placeholder(in context: Context) -> VerseEntry {
+        VerseEntry(date: .now, verse: verses[0].0, ref: verses[0].1)
+    }
+
+    func getSnapshot(in context: Context, completion: @escaping (VerseEntry) -> Void) {
+        let idx = dayIndex()
+        completion(VerseEntry(date: .now, verse: verses[idx].0, ref: verses[idx].1))
+    }
+
+    func getTimeline(in context: Context, completion: @escaping (Timeline<VerseEntry>) -> Void) {
+        let idx   = dayIndex()
+        let entry = VerseEntry(date: .now, verse: verses[idx].0, ref: verses[idx].1)
+        // تحديث عند منتصف الليل
+        let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? Date(timeIntervalSinceNow: 86400)
+        let midnight = Calendar.current.startOfDay(for: tomorrow)
+        completion(Timeline(entries: [entry], policy: .after(midnight)))
+    }
+
+    private func dayIndex() -> Int {
+        ((Calendar.current.ordinality(of: .day, in: .year, for: .now) ?? 1) - 1) % verses.count
+    }
+}
+
+struct VerseWidgetView: View {
+    let entry: VerseEntry
+    @Environment(\.widgetFamily) private var family
+
+    var body: some View {
+        switch family {
+
+        // ── شاشة القفل: مستطيل ─────────────────────────────────────
+        case .accessoryRectangular:
+            VStack(alignment: .trailing, spacing: 3) {
+                HStack {
+                    Spacer()
+                    Image(systemName: "book.fill")
+                        .font(.system(size: 9))
+                    Text("آية اليوم")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                Text(entry.verse)
+                    .font(.system(size: 10))
+                    .multilineTextAlignment(.trailing)
+                    .lineLimit(3)
+                    .minimumScaleFactor(0.65)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                HStack {
+                    Spacer()
+                    Text("﴾ \(entry.ref) ﴿")
+                        .font(.system(size: 8))
+                }
+            }
+
+        // ── شاشة الرئيسية ──────────────────────────────────────────
+        default:
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack {
+                    Spacer()
+                    Label("آية اليوم", systemImage: "book.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.yellow)
+                }
+                Text(entry.verse)
+                    .font(.system(size: family == .systemSmall ? 11 : 13))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.trailing)
+                    .lineSpacing(5)
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(family == .systemSmall ? 5 : 8)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                Spacer()
+                HStack {
+                    Spacer()
+                    Text("﴾ \(entry.ref) ﴿")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(family == .systemSmall ? 10 : 14)
+        }
+    }
+}

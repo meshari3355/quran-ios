@@ -1,0 +1,124 @@
+{
+  "identifier" : "tech.meshari.quranapp.storekit",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "tech.meshari.QuranApp",
+    "_storefront" : "SAU",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "20000001",
+      "localizations" : [
+        {
+          "description" : "اشتراك بريميوم لتطبيق القرآن الكريم",
+          "displayName" : "بريميوم القرآن",
+          "locale" : "ar_SA"
+        },
+        {
+          "description" : "Premium subscription for Quran App",
+          "displayName" : "Quran Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "Quran Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "3.99",
+          "familySharable" : false,
+          "groupNumber" : 1,
+          "introductoryOffer" : {
+            "duration" : 3,
+            "durationUnit" : "DAY",
+            "offerIdentifier" : "free_trial_3days",
+            "offerMode" : "FREE_TRIAL",
+            "periodCount" : 1
+          },
+          "localizations" : [
+            {
+              "description" : "اشتراك شهري للوصول لجميع مزايا البريميوم",
+              "displayName" : "بريميوم شهري",
+              "locale" : "ar_SA"
+            },
+            {
+              "description" : "Monthly subscription with full premium access",
+              "displayName" : "Monthly Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "tech.meshari.quranapp.premium.monthly",
+          "referenceName" : "Monthly Premium",
+          "recurringSubscriptionPeriod" : "P1M",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "35.00",
+          "familySharable" : false,
+          "groupNumber" : 2,
+          "introductoryOffer" : {
+            "duration" : 3,
+            "durationUnit" : "DAY",
+            "offerIdentifier" : "free_trial_3days_annual",
+            "offerMode" : "FREE_TRIAL",
+            "periodCount" : 1
+          },
+          "localizations" : [
+            {
+              "description" : "اشتراك سنوي بخصم 43% مقارنة بالشهري",
+              "displayName" : "بريميوم سنوي",
+              "locale" : "ar_SA"
+            },
+            {
+              "description" : "Annual subscription — save 43%",
+              "displayName" : "Annual Premium",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "tech.meshari.quranapp.premium.annual",
+          "referenceName" : "Annual Premium",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "subscriptionGroupID" : "20000001",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
