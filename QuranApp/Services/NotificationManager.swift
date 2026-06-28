@@ -16,7 +16,8 @@ final class NotificationManager {
 
     private let center = UNUserNotificationCenter.current()
     private let lastReadKey = "globalLastQuranReadDate"
-    private static let prayerNotificationPrefixes = ["prayer_", "prayerWarn_", "prayer5min_", "bgprayer_"]
+    private static let iqamaDelayMinutes = 15
+    private static let prayerNotificationPrefixes = ["prayer_", "prayerIqama_", "prayerWarn_", "prayer5min_", "bgprayer_"]
     private static let quranReminderPrefix = "quran_reminder"
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -251,6 +252,36 @@ final class NotificationManager {
                                          content: atContent, trigger: atTrigger)
                 )
                 addedRequests += 1
+
+                // ── إشعار إقامة الصلاة بعد الأذان بـ 15 دقيقة ───────────────
+                let iqamaDate = prayer.fireDate.addingTimeInterval(TimeInterval(Self.iqamaDelayMinutes * 60))
+                if iqamaDate > now, addedRequests < maxPrayerRequests {
+                    let iqamaComps = self.calendarComponents(for: iqamaDate, calendar: cal, tz: tz)
+
+                    let iqamaContent = UNMutableNotificationContent()
+                    iqamaContent.title              = "\(emoji) إقامة صلاة \(prayer.name)"
+                    iqamaContent.body               = "حان وقت إقامة صلاة \(prayer.name) • مرّت \(Self.iqamaDelayMinutes) دقيقة على الأذان"
+                    iqamaContent.sound              = .default
+                    iqamaContent.categoryIdentifier = "PRAYER_CATEGORY"
+                    iqamaContent.threadIdentifier   = "prayers"
+                    iqamaContent.relevanceScore     = 0.95
+                    if #available(iOS 15.0, *) {
+                        iqamaContent.interruptionLevel = .timeSensitive
+                    }
+                    iqamaContent.userInfo = [
+                        "route": "prayer",
+                        "prayer": prayer.name,
+                        "kind": "iqama",
+                        "delayMinutes": Self.iqamaDelayMinutes
+                    ]
+
+                    let iqamaTrigger = UNCalendarNotificationTrigger(dateMatching: iqamaComps, repeats: false)
+                    self.center.add(
+                        UNNotificationRequest(identifier: "prayerIqama_\(suffix)",
+                                             content: iqamaContent, trigger: iqamaTrigger)
+                    )
+                    addedRequests += 1
+                }
 
                 guard warningMinutes > 0, addedRequests < maxPrayerRequests else { continue }
                 let warningDate = prayer.fireDate.addingTimeInterval(TimeInterval(-warningMinutes * 60))

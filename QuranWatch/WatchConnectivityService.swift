@@ -207,8 +207,9 @@ class WatchConnectivityService: NSObject, ObservableObject {
 
     private func scheduleAuthorizedWatchNotifications(center: UNUserNotificationCenter) {
         // امسح القديم
+        let prayerNames = ["الفجر","الظهر","العصر","المغرب","العشاء"]
         center.removePendingNotificationRequests(withIdentifiers:
-            ["الفجر","الظهر","العصر","المغرب","العشاء"].map { "watch_prayer_\($0)" }
+            prayerNames.flatMap { ["watch_prayer_\($0)", "watch_iqama_\($0)"] }
         )
 
         let fmt = DateFormatter(); fmt.dateFormat = "HH:mm"
@@ -240,6 +241,25 @@ class WatchConnectivityService: NSObject, ObservableObject {
             center.add(UNNotificationRequest(
                 identifier: "watch_prayer_\(name)",
                 content: content, trigger: trigger
+            ))
+
+            let iqamaDate = fireDate.addingTimeInterval(15 * 60)
+            guard iqamaDate > Date() else { continue }
+
+            let iqamaContent = UNMutableNotificationContent()
+            iqamaContent.title       = "🕌 إقامة صلاة \(name)"
+            iqamaContent.body        = "مرّت 15 دقيقة على أذان \(name)"
+            iqamaContent.sound       = watchHapticEnabled ? .default : nil
+            iqamaContent.categoryIdentifier = "PRAYER_REMINDER"
+            iqamaContent.userInfo    = ["prayerName": name, "kind": "iqama"]
+
+            let iqamaTrigger = UNCalendarNotificationTrigger(
+                dateMatching: cal.dateComponents([.year,.month,.day,.hour,.minute], from: iqamaDate),
+                repeats: false
+            )
+            center.add(UNNotificationRequest(
+                identifier: "watch_iqama_\(name)",
+                content: iqamaContent, trigger: iqamaTrigger
             ))
         }
     }

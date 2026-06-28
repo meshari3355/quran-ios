@@ -337,6 +337,7 @@ struct QuickNotifSheet: View {
             DispatchQueue.main.async {
                 prayerNotifsActive = reqs.contains {
                     $0.identifier.hasPrefix("prayer_")
+                    || $0.identifier.hasPrefix("prayerIqama_")
                     || $0.identifier.hasPrefix("prayerWarn_")
                     || $0.identifier.hasPrefix("prayer5min_")
                     || $0.identifier.hasPrefix("bgprayer_")
