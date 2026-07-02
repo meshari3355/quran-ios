@@ -8,7 +8,7 @@ struct IslamicLibraryView: View {
     var body: some View {
         switch filter {
         case "tafsir":      TafsirBooksListView()
-        case "hadith":      HadithBooksView()
+        case "hadith":      HadithPortalView()
         case "translation": QuranTranslationsView()
         default:            TafsirBooksListView()
         }

@@ -22,12 +22,20 @@ final class HadithOfflineManager: ObservableObject {
     }
 
     nonisolated static let allCollections: [HadithCollection] = [
-        HadithCollection(id: "bukhari",  nameAr: "صحيح البخاري",   icon: "scroll.fill",          color: "purple", estimatedCount: 7563),
-        HadithCollection(id: "muslim",   nameAr: "صحيح مسلم",      icon: "book.closed.fill",      color: "green",  estimatedCount: 7453),
-        HadithCollection(id: "abudawud", nameAr: "سنن أبي داود",   icon: "books.vertical.fill",   color: "brown",  estimatedCount: 5274),
-        HadithCollection(id: "tirmidhi", nameAr: "جامع الترمذي",   icon: "book.fill",             color: "teal",   estimatedCount: 3956),
-        HadithCollection(id: "nasai",    nameAr: "سنن النسائي",    icon: "doc.text.fill",         color: "indigo", estimatedCount: 5761),
-        HadithCollection(id: "ibnmajah", nameAr: "سنن ابن ماجه",  icon: "text.book.closed.fill",  color: "orange", estimatedCount: 4341),
+        HadithCollection(id: "bukhari",         nameAr: "صحيح البخاري",        icon: "scroll.fill",          color: "purple", estimatedCount: 21178),
+        HadithCollection(id: "muslim",          nameAr: "صحيح مسلم",           icon: "book.closed.fill",     color: "green",  estimatedCount: 13763),
+        HadithCollection(id: "abudawud",        nameAr: "سنن أبي داود",        icon: "books.vertical.fill",  color: "brown",  estimatedCount: 5274),
+        HadithCollection(id: "tirmidhi",        nameAr: "جامع الترمذي",        icon: "book.fill",            color: "teal",   estimatedCount: 3998),
+        HadithCollection(id: "nasai",           nameAr: "سنن النسائي",         icon: "doc.text.fill",        color: "indigo", estimatedCount: 5765),
+        HadithCollection(id: "ibnmajah",        nameAr: "سنن ابن ماجه",        icon: "text.book.closed.fill", color: "orange", estimatedCount: 4343),
+        HadithCollection(id: "malik",           nameAr: "موطأ مالك",           icon: "book.pages.fill",      color: "cyan",   estimatedCount: 1829),
+        HadithCollection(id: "darimi",          nameAr: "سنن الدارمي",         icon: "book.closed.fill",     color: "blue",   estimatedCount: 2949),
+        HadithCollection(id: "ahmad",           nameAr: "مسند الإمام أحمد",    icon: "archivebox.fill",      color: "red",    estimatedCount: 4305),
+        HadithCollection(id: "nawawi40",        nameAr: "الأربعون النووية",    icon: "text.badge.star",      color: "pink",   estimatedCount: 42),
+        HadithCollection(id: "riyadussalihin",  nameAr: "رياض الصالحين",       icon: "leaf.fill",            color: "mint",   estimatedCount: 1217),
+        HadithCollection(id: "adab",            nameAr: "الأدب المفرد",        icon: "heart.text.square.fill", color: "gold",  estimatedCount: 1185),
+        HadithCollection(id: "shamail",         nameAr: "الشمائل المحمدية",    icon: "person.crop.circle.fill.badge.checkmark", color: "cyan", estimatedCount: 345),
+        HadithCollection(id: "bulugh",          nameAr: "بلوغ المرام",         icon: "scale.3d",             color: "yellow", estimatedCount: 378),
     ]
 
     // MARK: - State per collection

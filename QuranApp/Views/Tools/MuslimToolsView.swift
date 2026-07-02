@@ -128,7 +128,7 @@ struct MuslimToolsView: View {
                 NavigationLink(destination: HadithPortalView()) {
                     ToolCard(icon: "book.closed.fill", color: Color(red: 0.5, green: 0.1, blue: 0.1),
                              title: lang.t("كتب الحديث", "Hadith Books"),
-                             subtitle: lang.t("189 كتاب • 427,373 حديث", "189 books • 427,373 hadiths"))
+                             subtitle: lang.t("189 كتاب • بحث وتحميل", "189 books • search & offline"))
                 }.buttonStyle(.plain)
             }
 

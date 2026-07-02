@@ -227,41 +227,29 @@ struct HadithPortalChaptersView: View {
 
     // MARK: - Server collection mapping (quran.meshari.tech)
 
-    /// Maps portal book IDs → (quran.meshari.tech collection ID, total hadiths)
-    private var serverInfo: (collectionId: String, total: Int)? {
-        switch book.id {
-        case 33: return ("bukhari",  21178)
-        case 31: return ("muslim",   13763)
-        case 26: return ("abudawud",  5274)
-        case 38: return ("tirmidhi",  3998)
-        case 25: return ("nasai",     5765)
-        case 27: return ("ibnmajah",  4343)
-        case 30: return ("malik",          1829)
-        case 32: return ("darimi",         2949)
-        case 1:  return ("ahmad",          4305)
-        case 76: return ("nawawi40",         42)
-        // ── sunnah.com collections ──
-        case 756: return ("riyadussalihin", 1217)
-        case 55:  return ("adab",           1185)
-        case 131: return ("shamail",         345)
-        case 200: return ("bulugh",          378)
-        default: return nil
-        }
+    /// Maps portal book IDs to fast quran.meshari.tech collections.
+    private var serverInfo: HadithServerBookInfo? {
+        HadithServerBookCatalog.info(forPortalBookId: book.id)
     }
 
     /// Builds virtual page-chapters (no network needed).
-    /// Each covers pageSize consecutive hadith numbers on our server.
-    private func buildServerChapters(collectionId: String, total: Int) -> [PortalChapter] {
-        let pageSize = 100
+    /// Each covers consecutive server rows, including repeated routes for the same hadith number.
+    private func buildServerChapters(info: HadithServerBookInfo) -> [PortalChapter] {
+        let pageSize = HadithServerBookCatalog.pageSize
+        let total = info.totalRecords
         let pages    = (total + pageSize - 1) / pageSize
-        return (0..<pages).map { i in
-            let start = i * pageSize + 1
+        return (1...max(1, pages)).map { page in
+            let start = (page - 1) * pageSize + 1
             let end   = min(start + pageSize - 1, total)
             return PortalChapter(
-                id:        i + 1,
+                id:        HadithServerBookCatalog.virtualChapterId(bookId: book.id, page: page),
                 bookId:    book.id,
-                nameAr:    "الأحاديث \(start) – \(end)",
-                urlParams: "server:\(collectionId):\(start):\(end)"
+                nameAr:    pages == 1 ? "كامل الكتاب" : "المجموعة \(page) — السجلات \(start) – \(end)",
+                urlParams: HadithServerPageRequest(
+                    collectionId: info.collectionId,
+                    page: page,
+                    pageSize: pageSize
+                ).urlParams
             )
         }
     }
@@ -274,7 +262,7 @@ struct HadithPortalChaptersView: View {
 
         // Server-backed books: fast path, no external dependency
         if let info = serverInfo {
-            chapters  = buildServerChapters(collectionId: info.collectionId, total: info.total)
+            chapters  = buildServerChapters(info: info)
             isLoading = false
             return
         }

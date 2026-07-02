@@ -47,10 +47,90 @@ struct ServerHadithPage: Codable {
     let data: [ServerHadith]
 }
 
+// MARK: - Server-backed portal books
+
+struct HadithServerBookInfo: Hashable {
+    let portalBookId: Int
+    let collectionId: String
+    let totalRecords: Int
+}
+
+struct HadithServerPageRequest: Hashable {
+    let collectionId: String
+    let page: Int
+    let pageSize: Int
+
+    init(collectionId: String, page: Int, pageSize: Int = HadithServerBookCatalog.pageSize) {
+        self.collectionId = collectionId
+        self.page = max(1, page)
+        self.pageSize = min(max(1, pageSize), HadithServerBookCatalog.pageSize)
+    }
+
+    var urlParams: String {
+        "serverPage:\(collectionId):\(page):\(pageSize)"
+    }
+
+    static func parse(_ params: String) -> HadithServerPageRequest? {
+        let parts = params.split(separator: ":").map(String.init)
+
+        if parts.count >= 4, parts[0] == "serverPage",
+           let page = Int(parts[2]),
+           let pageSize = Int(parts[3]) {
+            return HadithServerPageRequest(collectionId: parts[1], page: page, pageSize: pageSize)
+        }
+
+        // Backward compatibility with cached chapters created as
+        // "server:{collectionId}:{start}:{end}". Those values were row ranges,
+        // not hadith numbers, so translate them back to API pages.
+        if parts.count == 4, parts[0] == "server",
+           let start = Int(parts[2]),
+           let end = Int(parts[3]) {
+            let rangeSize = max(1, end - start + 1)
+            let page = ((max(1, start) - 1) / HadithServerBookCatalog.pageSize) + 1
+            return HadithServerPageRequest(collectionId: parts[1], page: page, pageSize: rangeSize)
+        }
+
+        return nil
+    }
+}
+
+enum HadithServerBookCatalog {
+    static let pageSize = 100
+
+    static let books: [HadithServerBookInfo] = [
+        HadithServerBookInfo(portalBookId: 33,  collectionId: "bukhari",         totalRecords: 21178),
+        HadithServerBookInfo(portalBookId: 31,  collectionId: "muslim",          totalRecords: 13763),
+        HadithServerBookInfo(portalBookId: 26,  collectionId: "abudawud",        totalRecords: 5274),
+        HadithServerBookInfo(portalBookId: 38,  collectionId: "tirmidhi",        totalRecords: 3998),
+        HadithServerBookInfo(portalBookId: 25,  collectionId: "nasai",           totalRecords: 5765),
+        HadithServerBookInfo(portalBookId: 27,  collectionId: "ibnmajah",        totalRecords: 4343),
+        HadithServerBookInfo(portalBookId: 30,  collectionId: "malik",           totalRecords: 1829),
+        HadithServerBookInfo(portalBookId: 32,  collectionId: "darimi",          totalRecords: 2949),
+        HadithServerBookInfo(portalBookId: 1,   collectionId: "ahmad",           totalRecords: 4305),
+        HadithServerBookInfo(portalBookId: 76,  collectionId: "nawawi40",        totalRecords: 42),
+        HadithServerBookInfo(portalBookId: 756, collectionId: "riyadussalihin",  totalRecords: 1217),
+        HadithServerBookInfo(portalBookId: 55,  collectionId: "adab",            totalRecords: 1185),
+        HadithServerBookInfo(portalBookId: 131, collectionId: "shamail",         totalRecords: 345),
+        HadithServerBookInfo(portalBookId: 200, collectionId: "bulugh",          totalRecords: 378)
+    ]
+
+    static func info(forPortalBookId id: Int) -> HadithServerBookInfo? {
+        books.first { $0.portalBookId == id }
+    }
+
+    static func info(forCollectionId id: String) -> HadithServerBookInfo? {
+        books.first { $0.collectionId == id }
+    }
+
+    static func virtualChapterId(bookId: Int, page: Int) -> Int {
+        10_000_000 + bookId * 1_000 + page
+    }
+}
+
 // MARK: - HadithServerService
 
 /// Fetches hadith content from quran.meshari.tech.
-/// Supports 6 collections (54,321+ hadiths), paginated listing, and full-text search.
+/// Supports server-backed collections, paginated listing, and full-text search.
 final class HadithServerService: ObservableObject {
 
     static let shared = HadithServerService()
@@ -199,6 +279,10 @@ extension ServerHadith {
         case "darimi":   return "سنن الدارمي"
         case "ahmad":    return "مسند الإمام أحمد"
         case "nawawi40": return "الأربعون النووية"
+        case "riyadussalihin": return "رياض الصالحين"
+        case "adab":     return "الأدب المفرد"
+        case "shamail":  return "الشمائل المحمدية"
+        case "bulugh":   return "بلوغ المرام"
         default:         return collection_id
         }
     }

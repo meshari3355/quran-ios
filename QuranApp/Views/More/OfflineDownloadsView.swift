@@ -226,6 +226,13 @@ struct OfflineDownloadsView: View {
         case "teal":   return .teal
         case "indigo": return .indigo
         case "orange": return .orange
+        case "cyan":   return .cyan
+        case "blue":   return .blue
+        case "red":    return .red
+        case "pink":   return .pink
+        case "mint":   return .mint
+        case "gold":   return Theme.gold
+        case "yellow": return .yellow
         default:       return .blue
         }
     }

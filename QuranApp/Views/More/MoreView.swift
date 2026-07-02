@@ -251,7 +251,7 @@ struct MoreView: View {
                                     iconBg: Color.indigo.opacity(0.2),
                                     iconFg: Color.indigo,
                                     title: "بوابة الحديث النبوي",
-                                    subtitle: "427,373 حديث • 189 كتاب • 11 قسم",
+                                    subtitle: "189 كتاب • بحث وتحميل",
                                     showDivider: true
                                 )
                             }

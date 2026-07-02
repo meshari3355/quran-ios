@@ -224,8 +224,8 @@ struct HadithPortalBabsView: View {
         babs         = []
         hadiths      = []
 
-        // All chapters use the server — urlParams encoded as "server:{collectionId}:{start}:{end}"
-        if chapter.urlParams.hasPrefix("server:") {
+        // Server-backed chapters use the quran.meshari.tech page API.
+        if HadithServerPageRequest.parse(chapter.urlParams) != nil {
             await loadFromServer()
             return
         }
@@ -267,52 +267,40 @@ struct HadithPortalBabsView: View {
         }
     }
 
-    /// Fetches hadiths from quran.meshari.tech using the "server:" URL scheme.
-    /// All hadith requests fire concurrently for maximum speed.
+    /// Fetches hadiths from quran.meshari.tech using a single page request.
     private func loadFromServer() async {
-        // Parse "server:{collectionId}:{start}:{end}"
-        let parts = chapter.urlParams.split(separator: ":").map(String.init)
-        guard parts.count == 4,
-              let start = Int(parts[2]),
-              let end   = Int(parts[3]) else {
+        guard let request = HadithServerPageRequest.parse(chapter.urlParams) else {
             errorMessage = "خطأ في بيانات الفصل"
             isLoading    = false
             return
         }
-        let collectionId = parts[1]
-        let numbers      = Array(start...end)
 
-        // Capture plain value types before entering @Sendable task closures
-        let capturedBookId    = book.id
-        let capturedChapterId = chapter.id
-        let capturedBookName  = book.nameAr
+        do {
+            let page = try await HadithServerService.shared.fetchList(
+                collection: request.collectionId,
+                page: request.page,
+                pageSize: request.pageSize
+            )
 
-        var result: [(Int, PortalHadith)] = []
-
-        // Fire ALL requests concurrently — collect as they complete
-        await withTaskGroup(of: (Int, PortalHadith?).self) { group in
-            for num in numbers {
-                group.addTask {
-                    guard let h = try? await HadithServerService.shared.fetchHadith(
-                        collection: collectionId, number: num
-                    ), !h.fullTextAr.isEmpty else { return (num, nil) }
-                    let portal = PortalHadith(
-                        id:        num,
-                        bookId:    capturedBookId,
-                        chapterId: capturedChapterId,
-                        number:    "\(h.hadith_number ?? num)",
-                        text:      h.fullTextAr,
-                        bookName:  capturedBookName
-                    )
-                    return (num, portal)
-                }
+            let fetched = page.data.compactMap { h -> PortalHadith? in
+                let text = h.fullTextAr.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return nil }
+                return PortalHadith(
+                    id:        h.id,
+                    bookId:    book.id,
+                    chapterId: chapter.id,
+                    number:    "\(h.hadith_number ?? h.id)",
+                    text:      text,
+                    bookName:  book.nameAr
+                )
             }
-            for await (num, portal) in group {
-                if let p = portal { result.append((num, p)) }
-            }
+
+            hadiths = fetched
+            offline.saveHadithsBrowseCache(fetched, bookId: book.id, chapterId: chapter.id)
+            isLoading = false
+        } catch {
+            errorMessage = "تعذّر تحميل الأحاديث. تأكد من اتصال الإنترنت ثم أعد المحاولة."
+            isLoading = false
         }
-
-        hadiths   = result.sorted { $0.0 < $1.0 }.map(\.1)
-        isLoading = false
     }
 }

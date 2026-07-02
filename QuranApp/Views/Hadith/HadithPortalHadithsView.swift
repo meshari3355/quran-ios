@@ -16,31 +16,6 @@ struct HadithPortalHadithsView: View {
     @State private var isLoading:    Bool = true
     @State private var errorMessage: String? = nil
 
-    // ربط كل كتاب بـ collection_id على السيرفر
-    // يدعم الآن 14 collections
-    private var serverCollectionId: String? {
-        switch book.id {
-        // ── الكتب الستة ──
-        case 33: return "bukhari"         // صحيح البخاري
-        case 31: return "muslim"          // صحيح مسلم
-        case 26: return "abudawud"        // سنن أبي داود
-        case 38: return "tirmidhi"        // جامع الترمذي
-        case 25: return "nasai"           // سنن النسائي
-        case 27: return "ibnmajah"        // سنن ابن ماجه
-        // ── Collections إضافية ──
-        case 30: return "malik"           // موطأ الإمام مالك
-        case 32: return "darimi"          // سنن الدارمي
-        case 1:  return "ahmad"           // مسند الإمام أحمد
-        case 76: return "nawawi40"        // الأربعون النووية
-        // ── sunnah.com ──
-        case 756: return "riyadussalihin" // رياض الصالحين
-        case 55:  return "adab"           // الأدب المفرد
-        case 131: return "shamail"        // الشمائل المحمدية
-        case 200: return "bulugh"         // بلوغ المرام
-        default: return nil
-        }
-    }
-
     var body: some View {
         ZStack {
             Theme.background.ignoresSafeArea()
@@ -176,15 +151,17 @@ struct HadithPortalHadithsView: View {
     private func loadHadiths() async {
         isLoading    = true
         errorMessage = nil
+        let serverRequest = HadithServerPageRequest.parse(chapter.urlParams)
 
         // 1. Offline cache (fastest)
-        if let cached = offline.loadHadiths(bookId: book.id, chapterId: chapter.id), !cached.isEmpty {
+        if serverRequest == nil,
+           let cached = offline.loadHadiths(bookId: book.id, chapterId: chapter.id), !cached.isEmpty {
             hadiths   = cached
             isLoading = false
             return
         }
 
-        if !chapter.urlParams.hasPrefix("server:") {
+        if serverRequest == nil {
             do {
                 let fetched = try await HadithPortalService.shared.fetchHadiths(chapter: chapter)
                 hadiths = fetched
@@ -197,99 +174,45 @@ struct HadithPortalHadithsView: View {
             return
         }
 
-        if await loadServerRangeIfNeeded() {
+        if await loadServerPageIfNeeded() {
             return
         }
 
-        // 2. Server API (quran.meshari.tech) — الأولوية للسيرفر
-        if let collectionId = serverCollectionId {
-
-            // 2a. Locally cached collection
-            let localCache = HadithOfflineManager.shared.cachedHadiths(collectionId: collectionId)
-            if !localCache.isEmpty {
-                hadiths = localCache.enumerated().map { idx, h in
-                    PortalHadith(
-                        id: idx + 1,
-                        bookId: book.id,
-                        chapterId: chapter.id,
-                        number: h.hadith_number.map { "\($0)" } ?? "\(idx + 1)",
-                        text: h.fullTextAr,
-                        bookName: book.nameAr
-                    )
-                }
-                isLoading = false
-                return
-            }
-
-            // 2b. Live fetch from server list endpoint
-            do {
-                let page = try await HadithServerService.shared.fetchList(
-                    collection: collectionId,
-                    page: 1,
-                    pageSize: 100
-                )
-                if !page.data.isEmpty {
-                    hadiths = page.data.enumerated().map { idx, h in
-                        PortalHadith(
-                            id: idx + 1,
-                            bookId: book.id,
-                            chapterId: chapter.id,
-                            number: h.hadith_number.map { "\($0)" } ?? "\(idx + 1)",
-                            text: h.fullTextAr,
-                            bookName: book.nameAr
-                        )
-                    }
-                    isLoading = false
-                    return
-                }
-            } catch {
-                errorMessage = "تعذّر تحميل الأحاديث. تأكد من الاتصال بالإنترنت."
-                isLoading    = false
-            }
-        } else {
-            errorMessage = "تعذّر تحميل الأحاديث."
-            isLoading    = false
-        }
+        errorMessage = "تعذّر تحميل الأحاديث."
+        isLoading = false
     }
 
-    private func loadServerRangeIfNeeded() async -> Bool {
-        let parts = chapter.urlParams.split(separator: ":").map(String.init)
-        guard parts.count == 4,
-              let start = Int(parts[2]),
-              let end = Int(parts[3]) else { return false }
+    private func loadServerPageIfNeeded() async -> Bool {
+        guard let request = HadithServerPageRequest.parse(chapter.urlParams) else { return false }
 
-        let collectionId = parts[1]
-        let numbers = Array(start...end)
-        let capturedBookId = book.id
-        let capturedChapterId = chapter.id
-        let capturedBookName = book.nameAr
-        var result: [(Int, PortalHadith)] = []
+        do {
+            let page = try await HadithServerService.shared.fetchList(
+                collection: request.collectionId,
+                page: request.page,
+                pageSize: request.pageSize
+            )
 
-        await withTaskGroup(of: (Int, PortalHadith?).self) { group in
-            for num in numbers {
-                group.addTask {
-                    guard let h = try? await HadithServerService.shared.fetchHadith(
-                        collection: collectionId,
-                        number: num
-                    ), !h.fullTextAr.isEmpty else { return (num, nil) }
-                    return (num, PortalHadith(
-                        id: num,
-                        bookId: capturedBookId,
-                        chapterId: capturedChapterId,
-                        number: "\(h.hadith_number ?? num)",
-                        text: h.fullTextAr,
-                        bookName: capturedBookName
-                    ))
-                }
+            let fetched = page.data.compactMap { h -> PortalHadith? in
+                let text = h.fullTextAr.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !text.isEmpty else { return nil }
+                return PortalHadith(
+                    id: h.id,
+                    bookId: book.id,
+                    chapterId: chapter.id,
+                    number: "\(h.hadith_number ?? h.id)",
+                    text: text,
+                    bookName: book.nameAr
+                )
             }
-            for await (num, hadith) in group {
-                if let hadith { result.append((num, hadith)) }
-            }
+
+            hadiths = fetched
+            offline.saveHadithsBrowseCache(fetched, bookId: book.id, chapterId: chapter.id)
+            isLoading = false
+            return true
+        } catch {
+            errorMessage = "تعذّر تحميل الأحاديث. تأكد من الاتصال بالإنترنت."
+            isLoading = false
+            return true
         }
-
-        hadiths = result.sorted { $0.0 < $1.0 }.map(\.1)
-        offline.saveHadithsBrowseCache(hadiths, bookId: book.id, chapterId: chapter.id)
-        isLoading = false
-        return true
     }
 }

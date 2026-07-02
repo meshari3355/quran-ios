@@ -169,7 +169,7 @@ struct HadithPortalView: View {
         return ids.compactMap { PortalCategory.book(id: $0) }
     }
 
-    // MARK: - Extra Books Section (Malik, Darimi, Ahmad, Nawawi40)
+    // MARK: - Extra Books Section
 
     private var extraBooksSection: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -195,8 +195,7 @@ struct HadithPortalView: View {
     }
 
     private var extraBooks: [PortalBook] {
-        // Book IDs: malik=30, darimi=32, ahmad=1, nawawi40=76
-        let ids = [30, 32, 1, 76]
+        let ids = [30, 32, 1, 76, 756, 55, 131, 200]
         return ids.compactMap { PortalCategory.book(id: $0) }
     }
 
