@@ -83,6 +83,7 @@ struct HomeView: View {
             loadPrayerTimes()
             stats.refreshStats()
             lastReadEntry = findLastRead()
+            loc.requestLocation()
             loc.startHeadingUpdates()
             if let lat = loc.latitude, let lon = loc.longitude {
                 computeQiblaAngle(lat: lat, lon: lon)
@@ -90,6 +91,16 @@ struct HomeView: View {
         }
         .onChange(of: loc.locationReceived) { _ in
             loadPrayerTimes()
+            if let lat = loc.latitude, let lon = loc.longitude {
+                computeQiblaAngle(lat: lat, lon: lon)
+            }
+        }
+        .onChange(of: loc.latitude) { _ in
+            if let lat = loc.latitude, let lon = loc.longitude {
+                computeQiblaAngle(lat: lat, lon: lon)
+            }
+        }
+        .onChange(of: loc.longitude) { _ in
             if let lat = loc.latitude, let lon = loc.longitude {
                 computeQiblaAngle(lat: lat, lon: lon)
             }
@@ -467,13 +478,7 @@ struct HomeView: View {
     }
 
     private func computeQiblaAngle(lat: Double, lon: Double) {
-        let kaabaLat = 21.4225, kaabaLon = 39.8262
-        let lat1 = lat * .pi / 180, lon1 = lon * .pi / 180
-        let lat2 = kaabaLat * .pi / 180, lon2 = kaabaLon * .pi / 180
-        let dLon = lon2 - lon1
-        let y = sin(dLon) * cos(lat2)
-        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
-        qiblaAngle = fmod(atan2(y, x) * 180 / .pi + 360, 360)
+        qiblaAngle = QiblaService.shared.direction(fromLatitude: lat, longitude: lon).bearing
         qiblaCalculated = true
     }
 

@@ -99,8 +99,8 @@ struct WatchQiblaView: View {
 
                 // ── الزاوية ──
                 let qiblaAngle = qiblaFromNorth()
-                let needleAngle = qiblaAngle - headingManager.heading
-                let aligned = abs(normalizeAngle(needleAngle)) < 5
+                let needleAngle = signedWatchAngleDelta(from: headingManager.heading, to: qiblaAngle)
+                let aligned = abs(needleAngle) < 5
 
                 if !isCompassActive {
                     Button {
@@ -117,7 +117,7 @@ struct WatchQiblaView: View {
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(.green)
                 } else {
-                    let dir = needleAngle > 0 ? "أدر يسارًا" : "أدر يمينًا"
+                    let dir = needleAngle > 0 ? "أدر يمينًا" : "أدر يسارًا"
                     Text(dir)
                         .font(.system(size: 10))
                         .foregroundStyle(.white.opacity(0.7))
@@ -136,7 +136,7 @@ struct WatchQiblaView: View {
 
     private var compassView: some View {
         let qiblaAngle = qiblaFromNorth()
-        let needleRotation = qiblaAngle - headingManager.heading
+        let needleRotation = signedWatchAngleDelta(from: headingManager.heading, to: qiblaAngle)
 
         return ZStack {
             // حلقة خارجية
@@ -145,7 +145,7 @@ struct WatchQiblaView: View {
                 .frame(width: 90, height: 90)
 
             // نقاط الاتجاهات
-            ForEach([(0.0, "ش"), (90.0, "غ"), (180.0, "ج"), (270.0, "ق")], id: \.0) { angle, label in
+            ForEach([(0.0, "ش"), (90.0, "ق"), (180.0, "ج"), (270.0, "غ")], id: \.0) { angle, label in
                 Text(label)
                     .font(.system(size: 8, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
@@ -188,13 +188,6 @@ struct WatchQiblaView: View {
         guard connectivity.latitude != 0 || connectivity.longitude != 0 else { return 0 }
         return computeQiblaAngle(lat: connectivity.latitude, lon: connectivity.longitude)
     }
-
-    private func normalizeAngle(_ angle: Double) -> Double {
-        var a = angle.truncatingRemainder(dividingBy: 360)
-        if a > 180  { a -= 360 }
-        if a < -180 { a += 360 }
-        return a
-    }
 }
 
 // MARK: - Triangle Shape
@@ -215,17 +208,21 @@ private struct Triangle: Shape {
 final class WatchHeadingManager: NSObject, ObservableObject, CLLocationManagerDelegate {
 
     @Published var heading: Double = 0
+    @Published var headingAccuracy: Double = -1
 
     private var locationManager: CLLocationManager?
+    private var hasUsableHeading = false
 
     func startUpdating() {
         let manager = locationManager ?? CLLocationManager()
         locationManager = manager
         manager.delegate = self
+        manager.desiredAccuracy = kCLLocationAccuracyBest
 
         manager.requestWhenInUseAuthorization()
+        manager.requestLocation()
         if CLLocationManager.headingAvailable() {
-            manager.headingFilter = 2
+            manager.headingFilter = 1
             manager.startUpdatingHeading()
         }
     }
@@ -235,11 +232,40 @@ final class WatchHeadingManager: NSObject, ObservableObject, CLLocationManagerDe
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        let rawHeading = newHeading.trueHeading >= 0
+            ? newHeading.trueHeading
+            : newHeading.magneticHeading
+        guard rawHeading >= 0 else { return }
+        let normalizedHeading = normalizedWatchDegrees(rawHeading)
+        let accuracy = newHeading.headingAccuracy
         DispatchQueue.main.async {
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self.heading = newHeading.magneticHeading
+            let factor: Double
+            if !self.hasUsableHeading {
+                factor = 1
+                self.hasUsableHeading = true
+            } else if accuracy >= 0 && accuracy <= 12 {
+                factor = 0.45
+            } else {
+                factor = 0.28
+            }
+
+            withAnimation(.linear(duration: 0.12)) {
+                self.heading = smoothedWatchHeading(
+                    from: self.heading,
+                    to: normalizedHeading,
+                    factor: factor
+                )
+                self.headingAccuracy = accuracy
             }
         }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {}
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {}
+
+    func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        true
     }
 }
 

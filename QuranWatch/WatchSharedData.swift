@@ -118,8 +118,8 @@ func currentWatchVerse() -> (text: String, ref: String) {
 
 /// Compute Qibla angle from coordinates
 func computeQiblaAngle(lat: Double, lon: Double) -> Double {
-    let kaabaLat = 21.4225
-    let kaabaLon = 39.8262
+    let kaabaLat = 21.422487
+    let kaabaLon = 39.826206
     let latR   = lat * .pi / 180
     let lonR   = lon * .pi / 180
     let kLatR  = kaabaLat * .pi / 180
@@ -127,7 +127,20 @@ func computeQiblaAngle(lat: Double, lon: Double) -> Double {
     let dLon   = kLonR - lonR
     let y      = sin(dLon) * cos(kLatR)
     let x      = cos(latR) * sin(kLatR) - sin(latR) * cos(kLatR) * cos(dLon)
-    var angle  = atan2(y, x) * 180 / .pi
-    if angle < 0 { angle += 360 }
-    return angle
+    return normalizedWatchDegrees(atan2(y, x) * 180 / .pi)
+}
+
+func normalizedWatchDegrees(_ degrees: Double) -> Double {
+    let normalized = degrees.truncatingRemainder(dividingBy: 360)
+    return normalized < 0 ? normalized + 360 : normalized
+}
+
+func signedWatchAngleDelta(from current: Double, to target: Double) -> Double {
+    let delta = normalizedWatchDegrees(target - current)
+    return delta > 180 ? delta - 360 : delta
+}
+
+func smoothedWatchHeading(from current: Double, to target: Double, factor: Double) -> Double {
+    let clampedFactor = min(max(factor, 0), 1)
+    return normalizedWatchDegrees(current + signedWatchAngleDelta(from: current, to: target) * clampedFactor)
 }

@@ -12,17 +12,23 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
     private let manager = CLLocationManager()
 
     // ── Watchdog ──────────────────────────────────────────────────────────────
-    // Fires every 0.5 s; if no heading arrived in the last 1.5 s → hard restart
+    // Restarts only after a real stall. A short threshold causes repeated
+    // stop/start cycles and makes the compass feel frozen on some devices.
     private var watchdogTimer:       Timer?
     private var lastHeadingTimestamp: Date = .distantPast
+    private var lastHeadingRestart:   Date = .distantPast
     private var headingWasActive:    Bool  = false
-    private let watchdogInterval:    TimeInterval = 0.5   // check every 0.5 s
-    private let stallThreshold:      TimeInterval = 1.5   // restart if stalled > 1.5 s
+    private var isHeadingUpdating:    Bool  = false
+    private var hasUsableHeading:     Bool  = false
+    private let watchdogInterval:    TimeInterval = 1.0
+    private let stallThreshold:      TimeInterval = 6.0
+    private let restartCooldown:     TimeInterval = 4.0
 
     @Published var latitude:        Double? = nil
     @Published var longitude:       Double? = nil
     @Published var compassHeading:  Double  = 0    // true heading, degrees CW from North
     @Published var headingAccuracy: Double  = -1   // ≥ 0 valid, < 0 needs calibration
+    @Published var isPreciseLocationEnabled: Bool = true
     @Published var locationError:   String? = nil
     @Published var authStatus:      CLAuthorizationStatus = .notDetermined
     @Published var locationReceived: Bool   = false
@@ -33,9 +39,11 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
     override init() {
         super.init()
         manager.delegate         = self
-        manager.desiredAccuracy  = kCLLocationAccuracyKilometer
+        manager.desiredAccuracy  = kCLLocationAccuracyBest
+        manager.distanceFilter   = 10
+        manager.pausesLocationUpdatesAutomatically = true
         if CLLocationManager.headingAvailable() {
-            manager.headingFilter      = 1          // 1° sensitivity — smoothest possible
+            manager.headingFilter      = 1
             manager.headingOrientation = .portrait
         }
 
@@ -82,6 +90,7 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
+            refreshAccuracyAuthorization()
             manager.requestLocation()
             startHeadingUpdates()
         case .denied, .restricted:
@@ -94,13 +103,17 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
     func startHeadingUpdates() {
         guard CLLocationManager.headingAvailable() else { return }
         headingWasActive     = true
-        lastHeadingTimestamp = Date()       // prevent instant false-stall
-        hardRestartHeading()
+        lastHeadingTimestamp = Date()
+        if !isHeadingUpdating {
+            isHeadingUpdating = true
+            manager.startUpdatingHeading()
+        }
         startWatchdog()
     }
 
     func stopHeadingUpdates() {
         headingWasActive = false
+        isHeadingUpdating = false
         stopWatchdog()
         manager.stopUpdatingHeading()
     }
@@ -129,21 +142,29 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
         guard headingWasActive else { return }
         let staleDuration = Date().timeIntervalSince(lastHeadingTimestamp)
         if staleDuration > stallThreshold {
-            // Stalled — hard restart without delay
             hardRestartHeading()
         }
     }
 
-    /// Stop → start cycle clears any frozen state in CLLocationManager
+    /// Stop → start clears a frozen CLLocationManager, with cooldown to avoid loops.
     private func hardRestartHeading() {
+        guard Date().timeIntervalSince(lastHeadingRestart) >= restartCooldown else { return }
+        lastHeadingRestart = Date()
         manager.stopUpdatingHeading()
-        manager.startUpdatingHeading()
+        isHeadingUpdating = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            guard self.headingWasActive else { return }
+            self.lastHeadingTimestamp = Date()
+            self.isHeadingUpdating = true
+            self.manager.startUpdatingHeading()
+        }
     }
 
     // MARK: - CLLocationManagerDelegate
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let loc = locations.first else { return }
+        guard let loc = locations.last, loc.horizontalAccuracy >= 0 else { return }
+        refreshAccuracyAuthorization()
         DispatchQueue.main.async {
             self.latitude        = loc.coordinate.latitude
             self.longitude       = loc.coordinate.longitude
@@ -155,12 +176,34 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
     }
 
     func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        // Stamp the time so the watchdog knows we're alive
         lastHeadingTimestamp = Date()
+        let rawHeading = newHeading.trueHeading >= 0
+            ? newHeading.trueHeading
+            : newHeading.magneticHeading
+        guard rawHeading >= 0 else { return }
+        let normalizedHeading = QiblaService.normalizedDegrees(rawHeading)
+        let accuracy = newHeading.headingAccuracy
         DispatchQueue.main.async {
-            let h = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
-            self.compassHeading  = h
-            self.headingAccuracy = newHeading.headingAccuracy
+            let smoothingFactor: Double
+            if !self.hasUsableHeading {
+                smoothingFactor = 1
+                self.hasUsableHeading = true
+            } else if accuracy >= 0 && accuracy <= 12 {
+                smoothingFactor = 0.42
+            } else {
+                smoothingFactor = 0.25
+            }
+
+            let smoothed = QiblaService.smoothedHeading(
+                from: self.compassHeading,
+                to: normalizedHeading,
+                factor: smoothingFactor
+            )
+            let delta = abs(QiblaService.signedDelta(from: self.compassHeading, to: smoothed))
+            if delta >= 0.15 || self.headingAccuracy != accuracy {
+                self.compassHeading = smoothed
+                self.headingAccuracy = accuracy
+            }
         }
     }
 
@@ -184,6 +227,7 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
             locationError = nil
+            refreshAccuracyAuthorization()
             manager.requestLocation()
             startHeadingUpdates()
         case .denied, .restricted:
@@ -192,6 +236,22 @@ final class SharedLocationManager: NSObject, ObservableObject, CLLocationManager
             }
         default:
             break
+        }
+    }
+
+    func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
+        headingWasActive
+    }
+
+    private func refreshAccuracyAuthorization() {
+        if #available(iOS 14.0, *) {
+            let precise = manager.accuracyAuthorization == .fullAccuracy
+            DispatchQueue.main.async {
+                self.isPreciseLocationEnabled = precise
+                if !precise {
+                    self.locationError = "لأفضل دقة للقبلة فعّل الموقع الدقيق من إعدادات التطبيق"
+                }
+            }
         }
     }
 }

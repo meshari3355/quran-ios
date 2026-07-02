@@ -17,19 +17,37 @@ struct QiblaView: View {
     @State private var showCalibSheet = false
     @State private var showARCamera   = false
     @State private var showKaabaMap   = false
+    @State private var lastReverseGeocodedLocation: CLLocation?
 
-    private let kaabaLat = 21.4225
-    private let kaabaLon = 39.8262
+    private let kaabaLat = 21.422487
+    private let kaabaLon = 39.826206
 
     // Net screen angle of Qibla indicator: qiblaAngle - compassHeading
     // When == 0 the pin is at 12 o'clock (user is facing Qibla)
     private var needleScreenAngle: Double {
-        qiblaAngle - loc.compassHeading
+        QiblaService.signedDelta(from: loc.compassHeading, to: qiblaAngle)
     }
 
     private var isNearlyAligned: Bool {
-        let a = fmod(abs(needleScreenAngle) + 360, 360)
-        return a < 7 || a > 353
+        abs(needleScreenAngle) < 6
+    }
+
+    private var headingStatusText: String {
+        if let locationError = loc.locationError {
+            return locationError
+        }
+        if !loc.isPreciseLocationEnabled {
+            return "فعّل الموقع الدقيق لزيادة دقة اتجاه القبلة"
+        }
+        if loc.headingAccuracy < 0 {
+            return "حرّك الجهاز على شكل رقم 8 لمعايرة البوصلة"
+        }
+        if loc.headingAccuracy > 25 {
+            return "دقة البوصلة منخفضة، ابتعد عن المعادن والأجهزة المغناطيسية"
+        }
+        return isCalculated
+            ? "حرّك الجهاز حتى تصل إبرة القبلة ذهبية لأعلى"
+            : "جارٍ تحديد الموقع..."
     }
 
     // ── Derived from Theme ──────────────────────────────────────
@@ -200,11 +218,11 @@ struct QiblaView: View {
                     .overlay(Capsule().stroke(Color.green.opacity(0.3), lineWidth: 1))
                     .transition(.scale.combined(with: .opacity))
                 } else {
-                    Text(isCalculated
-                         ? "حرّك الجهاز حتى تصل إبرة القبلة ذهبية لأعلى"
-                         : "جارٍ تحديد الموقع...")
+                    Text(headingStatusText)
                         .font(.system(size: 13))
                         .foregroundColor(Theme.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 20)
                 }
 
                 Spacer()
@@ -231,7 +249,11 @@ struct QiblaView: View {
                 VStack(spacing: 14) {
                     HStack {
                         // Re-locate button
-                        Button { loc.requestLocation() } label: {
+                        Button {
+                            loc.requestLocation()
+                            loc.startHeadingUpdates()
+                            refreshQiblaFromCurrentLocation()
+                        } label: {
                             ZStack {
                                 Circle()
                                     .fill(cardColor)
@@ -302,11 +324,9 @@ struct QiblaView: View {
             QiblaARCameraView(qiblaAngle: qiblaAngle, distanceKm: distanceKm)
         }
         .onAppear {
+            loc.requestLocation()
             loc.startHeadingUpdates()
-            if let lat = loc.latitude, let lon = loc.longitude {
-                calculateQibla(lat: lat, lon: lon)
-                reverseGeocode(lat: lat, lon: lon)
-            }
+            refreshQiblaFromCurrentLocation()
         }
         .onDisappear { loc.stopHeadingUpdates() }
         .onChange(of: showARCamera) { isOpen in
@@ -322,10 +342,13 @@ struct QiblaView: View {
             }
         }
         .onChange(of: loc.locationReceived) { received in
-            if received, let lat = loc.latitude, let lon = loc.longitude {
-                calculateQibla(lat: lat, lon: lon)
-                reverseGeocode(lat: lat, lon: lon)
-            }
+            if received { refreshQiblaFromCurrentLocation() }
+        }
+        .onChange(of: loc.latitude) { _ in
+            refreshQiblaFromCurrentLocation()
+        }
+        .onChange(of: loc.longitude) { _ in
+            refreshQiblaFromCurrentLocation()
         }
         .onChange(of: isNearlyAligned) { aligned in
             if aligned {
@@ -345,17 +368,23 @@ struct QiblaView: View {
 
     // MARK: - Qibla Calculation
     private func calculateQibla(lat: Double, lon: Double) {
-        let lat1 = lat * .pi / 180,  lon1 = lon * .pi / 180
-        let lat2 = kaabaLat * .pi / 180, lon2 = kaabaLon * .pi / 180
-        let dLon = lon2 - lon1
-        let y = sin(dLon) * cos(lat2)
-        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
-        qiblaAngle = fmod(atan2(y, x) * 180 / .pi + 360, 360)
-
-        let R = 6371.0, dLat = lat2 - lat1
-        let a = sin(dLat/2)*sin(dLat/2) + cos(lat1)*cos(lat2)*sin(dLon/2)*sin(dLon/2)
-        distanceKm = R * 2 * atan2(sqrt(a), sqrt(1-a))
+        let direction = QiblaService.shared.direction(fromLatitude: lat, longitude: lon)
+        qiblaAngle = direction.bearing
+        distanceKm = direction.distanceKm
         isCalculated = true
+    }
+
+    private func refreshQiblaFromCurrentLocation() {
+        guard let lat = loc.latitude, let lon = loc.longitude else { return }
+        calculateQibla(lat: lat, lon: lon)
+
+        let currentLocation = CLLocation(latitude: lat, longitude: lon)
+        if let lastReverseGeocodedLocation,
+           currentLocation.distance(from: lastReverseGeocodedLocation) < 1000 {
+            return
+        }
+        lastReverseGeocodedLocation = currentLocation
+        reverseGeocode(lat: lat, lon: lon)
     }
 
     private func reverseGeocode(lat: Double, lon: Double) {
@@ -968,10 +997,7 @@ struct QiblaARCameraView: View {
     /// Positive = Qibla is clockwise from current heading (turn right)
     /// Negative = Qibla is counter-clockwise (turn left)
     private var offsetAngle: Double {
-        var a = qiblaAngle - loc.compassHeading
-        while a >  180 { a -= 360 }
-        while a < -180 { a += 360 }
-        return a
+        QiblaService.signedDelta(from: loc.compassHeading, to: qiblaAngle)
     }
 
     private var isAligned: Bool { abs(offsetAngle) < 6 }
@@ -1130,6 +1156,7 @@ struct QiblaARCameraView: View {
             }
         }
         .onAppear {
+            loc.requestLocation()
             loc.startHeadingUpdates()
             AVCaptureDevice.requestAccess(for: .video) { granted in
                 DispatchQueue.main.async {
